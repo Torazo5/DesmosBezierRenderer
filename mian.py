@@ -4,7 +4,7 @@ import potrace
 from potrace import Bitmap
 import matplotlib.pyplot as plt
 
-def plot_curve(ax, curve):
+def plot_curve(ax, curve, latex_list):
     # Get the starting point of the curve
     start_point = curve.start_point
     
@@ -18,8 +18,9 @@ def plot_curve(ax, curve):
             c2 = segment.c2
             end_point = segment.end_point
 
-            # Add points for plotting the curve
-            curve_points.append([start_point, c1, c2, end_point])
+            # Invert y-coordinates for plotting the curve
+            inverted_points = [[x, -y] for x, y in [start_point, c1, c2, end_point]]
+            curve_points.append(inverted_points)
 
             # Update the start_point for the next segment
             start_point = end_point
@@ -29,12 +30,16 @@ def plot_curve(ax, curve):
         bezier_curve = np.array(points).reshape(-1, 2)
         ax.plot(bezier_curve[:, 0], bezier_curve[:, 1], 'b-')
 
-def plot_path(ax, path):
+        # Append equation for the current Bezier curve to the latex list
+        equation = f"((1-t)((1-t)((1-t){points[0][0]}+t{points[1][0]})+t((1-t){points[1][0]}+t{points[2][0]}))+t((1-t)((1-t){points[1][0]}+t{points[2][0]})+t((1-t){points[2][0]}+t{points[3][0]})), (1-t)((1-t)((1-t){points[0][1]}+t{points[1][1]})+t((1-t){points[1][1]}+t{points[2][1]}))+t((1-t)((1-t){points[1][1]}+t{points[2][1]})+t((1-t){points[2][1]}+t{points[3][1]})))"
+        latex_list.append(equation)
+
+def plot_path(ax, path, latex_list):
     # Plot each curve in the path
     for curve in path.curves:
-        plot_curve(ax, curve)
+        plot_curve(ax, curve, latex_list)
 
-def plot_edges_and_curves(image_path):
+def plot_edges_and_curves(image_path, output_file):
     # Load the image
     frame = cv.imread(image_path)
 
@@ -56,14 +61,19 @@ def plot_edges_and_curves(image_path):
     bitmap = Bitmap(edges_binary)
 
     # Trace the bitmap
+    latex_list = []  # List to store equations
     path = bitmap.trace(turdsize=50, turnpolicy=potrace.TURNPOLICY_MINORITY, alphamax=1.3, opticurve=1, opttolerance=0.03)
 
     # Create a Matplotlib figure and axis for Bezier curves
     fig1, ax1 = plt.subplots()
 
     # Plot Bezier curves for edges
-    plt.gca().invert_yaxis()
-    plot_path(ax1, path)
+    plot_path(ax1, path, latex_list)
+
+    # Write equations to the output file
+    with open(output_file, 'w') as file:
+        for equation in latex_list:
+            file.write(equation + '\n')
 
     # Create a Matplotlib figure and axis for original Canny edges
     fig2, ax2 = plt.subplots()
@@ -76,4 +86,5 @@ def plot_edges_and_curves(image_path):
 
 # Example usage
 image_path = '/home/torazo/Downloads/face grapher 3/DesmosBezierRenderer/b9afd24d812a6d61769845416f139efcd6042914.jpeg'
-plot_edges_and_curves(image_path)
+output_file = 'equations.txt'
+plot_edges_and_curves(image_path, output_file)
